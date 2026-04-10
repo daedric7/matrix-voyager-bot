@@ -298,24 +298,27 @@ class VoyagerBot {
                     log.silly("VoyagerBot", "m.room.join_rules for " + roomId + " is " + event['content']['join_rule']);
                     version.isAnonymous = event['content']['join_rule'] !== 'public';
                 } else if (event['type'] === 'm.room.member') {
-                    if (event['user_id'] === this._client.selfId) return; // skip ourselves, always
-                    log.silly("VoyagerBot", "m.room.member of " + event['user_id'] + " in " + roomId + " is " + event['membership']);
+                    var memberId = event['state_key'] || event['user_id'];
+                    if (memberId === this._client.selfId) return; // skip ourselves, always
+                    var membership = event['content']['membership'] || event['membership'];
+                    log.silly("VoyagerBot", "m.room.member of " + memberId + " in " + roomId + " is " + membership);
 
                     var displayName = event['content']['displayname'];
                     if (!displayName || displayName.trim().length === 0)
-                        displayName = event['user_id'];
+                        displayName = memberId;
 
                     roomMembers.push(displayName);
-                    if (event['membership'] === 'join' || event['membership'] === 'invite') joinedMembers.push(displayName);
-                    tryAddServer(event['user_id']);
+                    if (membership === 'join' || membership === 'invite') joinedMembers.push(displayName);
+                    if (memberId) tryAddServer(memberId);
 
                     // Create the node, but don't bother updating the information for it
-                    return this.getNode(event['user_id'], 'user').then(n => log.silly("VoyagerBot", "Got node for " + n.objectId + ": " + n.id));
+                    return this.getNode(memberId, 'user').then(n => log.silly("VoyagerBot", "Got node for " + n.objectId + ": " + n.id));
                 } else if (event['type'] === 'm.room.aliases') {
+                    // Deprecated since Matrix r0.6.1 - kept for compatibility with older servers only
                     if (event['content']['aliases']) {
                         log.silly("VoyagerBot", "m.room.aliases for " + roomId + " on domain " + event['state_key'] + " is: " + event['content']['aliases'].join(', '));
                         for (var alias of event['content']['aliases']) {
-                            version.aliases.push(alias);
+                            if (version.aliases.indexOf(alias) === -1) version.aliases.push(alias);
                             if (alias.endsWith(":matrix.org")) matrixDotOrgAliases.push(alias);
                             tryAddServer(alias);
                         }
@@ -324,6 +327,13 @@ class VoyagerBot {
                     log.silly("VoyagerBot", "m.room.canonical_alias for " + roomId + " is " + event['content']['alias']);
                     version.primaryAlias = event['content']['alias'];
                     if (event['content']['alias']) tryAddServer(event['content']['alias']);
+                    // alt_aliases added in MSC2432 / Matrix r0.6.1, replacing m.room.aliases
+                    var altAliases = event['content']['alt_aliases'] || [];
+                    for (var altAlias of altAliases) {
+                        if (version.aliases.indexOf(altAlias) === -1) version.aliases.push(altAlias);
+                        if (altAlias.endsWith(":matrix.org")) matrixDotOrgAliases.push(altAlias);
+                        tryAddServer(altAlias);
+                    }
                 } else if (event['type'] === 'm.room.name') {
                     log.silly("VoyagerBot", "m.room.name for " + roomId + " is " + event['content']['name']);
                     version.displayName = event['content']['name'];
