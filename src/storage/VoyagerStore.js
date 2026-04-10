@@ -1,6 +1,7 @@
 var DBMigrate = require("db-migrate");
 var log = require("./../LogService");
 var Sequelize = require('sequelize');
+var Op = Sequelize.Op;
 var dbConfig = require("../../config/database.json");
 var map = require("promise-map");
 var Promise = require('bluebird');
@@ -576,8 +577,8 @@ class VoyagerStore {
 
         return this.__StateEvents.findAndCountAll({
             where: {
-                linkId: {$not: null},
-                timestamp: {$gt: new Date(since)}
+                linkId: {[Op.not]: null},
+                timestamp: {[Op.gt]: new Date(since)}
             },
             include: [{
                 model: this.__Links,
@@ -588,8 +589,8 @@ class VoyagerStore {
             linkResults = lse;
             return this.__StateEvents.findAndCountAll({
                 where: {
-                    nodeId: {$not: null},
-                    timestamp: {$gt: since}
+                    nodeId: {[Op.not]: null},
+                    timestamp: {[Op.gt]: since}
                 },
                 include: [{
                     model: this.__Nodes,
@@ -629,7 +630,7 @@ class VoyagerStore {
      * @returns {Promise<number>} resolves to the number of remaining events
      */
     getCountTimelineEventsAfter(timestamp) {
-        return this.__TimelineEvents.count({where: {timestamp: {$gt: new Date(timestamp)}}});
+        return this.__TimelineEvents.count({where: {timestamp: {[Op.gt]: new Date(timestamp)}}});
     }
 
     /**
@@ -641,7 +642,7 @@ class VoyagerStore {
     getTimelineEventsPaginated(since, limit) {
         return this.__TimelineEvents.findAndCountAll({
             where: {
-                timestamp: {$gt: new Date(since)}
+                timestamp: {[Op.gt]: new Date(since)}
             },
             include: [{
                 model: this.__Links,
@@ -742,7 +743,7 @@ class VoyagerStore {
             rooms.map(n => promise = promise.then(() => {
                 return this.__Links.findAll({
                     where: {
-                        $or: [
+                        [Op.or]: [
                             {sourceNodeId: n.id},
                             {targetNodeId: n.id}
                         ]
@@ -779,14 +780,14 @@ class VoyagerStore {
 
         var metaPromise = this.__NodeMeta.findAll({
             where: {
-                $and: [
-                    // {primaryAlias: {$not: null, $ne: ''}},
+                [Op.and]: [
+                    // {primaryAlias: {[Op.not]: null, [Op.ne]: ''}},
                     {isAnonymous: false},
                     {
-                        $or: likeCondition.map(k => {
-                            return {primaryAlias: (this._isPsql ? {$iLike: k} : {$like: k})};
+                        [Op.or]: likeCondition.map(k => {
+                            return {primaryAlias: (this._isPsql ? {[Op.iLike]: k} : {[Op.like]: k})};
                         }).concat(likeCondition.map(k => {
-                            return {displayName: (this._isPsql ? {$iLike: k} : {$like: k})};
+                            return {displayName: (this._isPsql ? {[Op.iLike]: k} : {[Op.like]: k})};
                         }))
                     },
                 ]
@@ -795,8 +796,8 @@ class VoyagerStore {
 
         var aliasPromise = this.__NodeAliases.findAll({
             where: {
-                $or: likeCondition.map(k => {
-                    return {alias: (this._isPsql ? {$iLike: k} : {$like: k})};
+                [Op.or]: likeCondition.map(k => {
+                    return {alias: (this._isPsql ? {[Op.iLike]: k} : {[Op.like]: k})};
                 })
             }
         }).then(aliases => rawAliases = (aliases || []).map(a => new NodeAlias(a)));
@@ -824,7 +825,7 @@ class VoyagerStore {
                 }
             }
 
-            return this.__NodeMeta.findAll({where: {nodeId: {$in: missingMeta}}});
+            return this.__NodeMeta.findAll({where: {nodeId: {[Op.in]: missingMeta}}});
         }).then(foundMeta => {
             for (var meta of foundMeta) {
                 if (!nodeMap[meta.nodeId])
@@ -849,7 +850,7 @@ class VoyagerStore {
                 promise = promise.then(() => {
                     return this.__Links.findAll({
                         where: {
-                            $or: [
+                            [Op.or]: [
                                 {sourceNodeId: node.id},
                                 {targetNodeId: node.id}
                             ]
