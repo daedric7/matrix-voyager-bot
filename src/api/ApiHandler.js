@@ -30,6 +30,7 @@ class ApiHandler {
         this._app.get('/api/v1/nodes/:id', this._getNode.bind(this));
         this._app.get('/api/v1/events', this._getEvents.bind(this));
         this._app.get('/api/v1/stats', this._getStats.bind(this));
+        this._app.get('/api/v1/media/thumbnail/:serverName/:mediaId', this._getMediaThumbnail.bind(this));
     }
 
     start() {
@@ -263,11 +264,49 @@ class ApiHandler {
         if (!obj.meta.isAnonymous) {
             obj.meta.objectId = node.objectId;
             if (meta.displayName !== null && (meta.displayName !== '' && !allowEmptyStrings)) obj.meta.displayName = meta.displayName;
-            if (meta.avatarUrl !== null && (meta.avatarUrl !== '' && !allowEmptyStrings)) obj.meta.avatarUrl = meta.avatarUrl;
+            if (meta.avatarUrl !== null && (meta.avatarUrl !== '' && !allowEmptyStrings)) obj.meta.avatarUrl = ApiHandler._mediaUrlToProxy(meta.avatarUrl);
             if (meta.primaryAlias !== null && (meta.primaryAlias !== '' && !allowEmptyStrings)) obj.meta.primaryAlias = meta.primaryAlias;
         }
 
         return obj;
+    }
+
+    _getMediaThumbnail(request, response) {
+        var serverName = request.params.serverName;
+        var mediaId = request.params.mediaId;
+        var width = parseInt(request.query.width) || 256;
+        var height = parseInt(request.query.height) || 256;
+
+        log.info("ApiHandler", "Proxying media thumbnail: " + serverName + "/" + mediaId);
+        this._bot._client.downloadMediaThumbnail(serverName, mediaId, width, height)
+            .on('error', err => {
+                log.error("ApiHandler", err);
+                response.sendStatus(502);
+            })
+            .pipe(response);
+    }
+
+    static _mediaUrlToProxy(avatarUrl) {
+        if (!avatarUrl) return avatarUrl;
+
+        // New format: mxc://serverName/mediaId
+        if (avatarUrl.startsWith('mxc://')) {
+            var mxcPath = avatarUrl.substring('mxc://'.length).split('?')[0].split('#')[0];
+            var slashIdx = mxcPath.indexOf('/');
+            if (slashIdx !== -1) {
+                var serverName = mxcPath.substring(0, slashIdx);
+                var mediaId = mxcPath.substring(slashIdx + 1);
+                return '/api/v1/media/thumbnail/' + serverName + '/' + mediaId + '?width=256&height=256';
+            }
+        }
+
+        // Legacy format: https://homeserver/_matrix/media/r0/thumbnail/serverName/mediaId
+        var legacyMatch = avatarUrl.match(/\/_matrix\/media\/[^/]+\/thumbnail\/([^/?]+)\/([^/?]+)/);
+        if (legacyMatch) {
+            return '/api/v1/media/thumbnail/' + legacyMatch[1] + '/' + legacyMatch[2] + '?width=256&height=256';
+        }
+
+        return avatarUrl;
     }
 
     _linkToJsonObject(link) {

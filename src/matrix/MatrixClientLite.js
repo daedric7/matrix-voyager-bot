@@ -341,6 +341,24 @@ class MatrixLiteClient extends EventEmitter {
         return this._homeserverUrl + "/_matrix/media/r0/thumbnail/" + shorthand + "?width=" + width + "&height=" + height;
     }
 
+    /**
+     * Downloads a media thumbnail via the authenticated media endpoint (MSC3916).
+     * Returns a pipeable request stream.
+     * @param {string} serverName the media server name
+     * @param {string} mediaId the media ID
+     * @param {number} width desired thumbnail width
+     * @param {number} height desired thumbnail height
+     * @returns {object} a pipeable request stream
+     */
+    downloadMediaThumbnail(serverName, mediaId, width, height) {
+        var url = this._homeserverUrl + "/_matrix/client/v1/media/thumbnail/" + serverName + "/" + mediaId;
+        return request({
+            url: url,
+            qs: {width: width, height: height, method: "scale"},
+            headers: {"Authorization": "Bearer " + this._accessToken}
+        });
+    }
+
     _do(method, endpoint, qs = null, body = null, timeout = 60000, raw = false) {
         if (!endpoint.startsWith('/'))
             endpoint = '/' + endpoint;

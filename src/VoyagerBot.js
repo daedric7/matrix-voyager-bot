@@ -261,7 +261,6 @@ class VoyagerBot {
 
             if (!version.avatarUrl || version.avatarUrl.trim().length == 0)
                 version.avatarUrl = null;
-            else version.avatarUrl = this._client.convertMediaToThumbnail(version.avatarUrl, 256, 256);
 
             if (!version.displayName || version.displayName.trim().length == 0)
                 version.displayName = null;
@@ -331,7 +330,7 @@ class VoyagerBot {
                 } else if (event['type'] === 'm.room.avatar') {
                     log.silly("VoyagerBot", "m.room.avatar for " + roomId + " is " + event['content']['url']);
                     if (event['content']['url'] && event['content']['url'].trim().length > 0)
-                        version.avatarUrl = this._client.convertMediaToThumbnail(event['content']['url'], 256, 256);
+                        version.avatarUrl = event['content']['url'];
                 } else log.silly("VoyagerBot", "Not handling state event " + event['type'] + " in room " + roomId);
             }));
 
