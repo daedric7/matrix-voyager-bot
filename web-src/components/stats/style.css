@@ -86,3 +86,11 @@
 .sortable {
     cursor: pointer;
 }
+
+.anonymous-room {
+    background-color: #ffe0f0;
+}
+
+.no-alias {
+    color: #aaa;
+}

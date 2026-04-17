@@ -27,6 +27,7 @@ class ApiHandler {
         this._app.get('/api/v1/network', this._getNetwork.bind(this));
         this._app.get('/api/v1/nodes', this._getNodes.bind(this));
         this._app.get('/api/v1/nodes/publicRooms', this._getPublicRooms.bind(this));
+        this._app.get('/api/v1/nodes/allRooms', this._getAllRooms.bind(this));
         this._app.get('/api/v1/nodes/:id', this._getNode.bind(this));
         this._app.get('/api/v1/events', this._getEvents.bind(this));
         this._app.get('/api/v1/stats', this._getStats.bind(this));
@@ -154,13 +155,20 @@ class ApiHandler {
 
     _getPublicRooms(request, response) {
         this._store.getPublicRooms().then(nodes => {
-            var promise = Promise.resolve();
             var mapped = nodes.map(r => this._nodeToJsonObject(r, r.currentMeta));
+            response.setHeader("Content-Type", "application/json");
+            response.send(JSON.stringify(mapped));
+        }).catch(err => {
+            log.error("ApiHandler", err);
+            response.sendStatus(500);
+        });
+    }
 
-            promise.then(() => {
-                response.setHeader("Content-Type", "application/json");
-                response.send(JSON.stringify(mapped));
-            });
+    _getAllRooms(request, response) {
+        this._store.getAllRooms().then(nodes => {
+            var mapped = nodes.map(r => this._nodeToJsonObject(r, r.currentMeta));
+            response.setHeader("Content-Type", "application/json");
+            response.send(JSON.stringify(mapped));
         }).catch(err => {
             log.error("ApiHandler", err);
             response.sendStatus(500);
@@ -261,12 +269,10 @@ class ApiHandler {
             }
         };
 
-        if (!obj.meta.isAnonymous) {
-            obj.meta.objectId = node.objectId;
-            if (meta.displayName !== null && (meta.displayName !== '' && !allowEmptyStrings)) obj.meta.displayName = meta.displayName;
-            if (meta.avatarUrl !== null && (meta.avatarUrl !== '' && !allowEmptyStrings)) obj.meta.avatarUrl = ApiHandler._mediaUrlToProxy(meta.avatarUrl);
-            if (meta.primaryAlias !== null && (meta.primaryAlias !== '' && !allowEmptyStrings)) obj.meta.primaryAlias = meta.primaryAlias;
-        }
+        obj.meta.objectId = node.objectId;
+        if (meta.displayName !== null && (meta.displayName !== '' && !allowEmptyStrings)) obj.meta.displayName = meta.displayName;
+        if (meta.avatarUrl !== null && (meta.avatarUrl !== '' && !allowEmptyStrings)) obj.meta.avatarUrl = ApiHandler._mediaUrlToProxy(meta.avatarUrl);
+        if (meta.primaryAlias !== null && (meta.primaryAlias !== '' && !allowEmptyStrings)) obj.meta.primaryAlias = meta.primaryAlias;
 
         return obj;
     }

@@ -255,9 +255,10 @@ class MatrixLiteClient extends EventEmitter {
     /**
      * Joins the given room
      * @param {string} roomIdOrAlias the room ID or alias to join
+     * @param {string[]} viaServers optional list of servers to use for federation when joining by room ID
      * @returns {Promise<string>} resolves to the joined room ID
      */
-    joinRoom(roomIdOrAlias) {
+    joinRoom(roomIdOrAlias, viaServers = []) {
         if (this._joinedRooms.indexOf(roomIdOrAlias) !== -1) {
             log.info("MatrixClientLite", "No-oping join: Already joined room");
             return Promise.resolve(roomIdOrAlias);
@@ -266,19 +267,23 @@ class MatrixLiteClient extends EventEmitter {
         var isRoom = roomIdOrAlias[0] === '!';
         var originalId = roomIdOrAlias;
         roomIdOrAlias = encodeURIComponent(roomIdOrAlias);
-      
-        // TODO: Make this better
+
+        // Do a directory lookup to get the room ID for aliases, or skip for room IDs
         var joinPromise = isRoom ? Promise.resolve({room_id: originalId}) : this._do("GET", "/_matrix/client/r0/directory/room/" + roomIdOrAlias);
 
-        // Do a directory lookup to get the room ID
         return joinPromise.then(response => {
             if (this._joinedRooms.indexOf(response['room_id']) !== -1) {
                 log.info("MatrixClientLite", "No-oping join: Already joined room");
                 return response;
             }
 
-            // Actually do the join because we aren't joined
-            return this._do("POST", "/_matrix/client/r0/join/" + roomIdOrAlias);
+            // Build server_name query params for federation routing
+            var qs = {};
+            if (isRoom && viaServers.length > 0) {
+                qs['server_name'] = viaServers;
+            }
+
+            return this._do("POST", "/_matrix/client/r0/join/" + roomIdOrAlias, qs);
         }).then(response => {
             return response['room_id'];
         });
@@ -308,7 +313,7 @@ class MatrixLiteClient extends EventEmitter {
      * @returns {Promise<*>} resolves when the receipt has been sent
      */
     sendReadReceipt(roomId, eventId) {
-        return this._do("POST", "/_matrix/client/r0/rooms/" + roomId + "/receipt/m.read/" + eventId);
+        return this._do("POST", "/_matrix/client/r0/rooms/" + roomId + "/receipt/m.read/" + eventId, null, {});
     }
 
     /**
@@ -386,6 +391,7 @@ class MatrixLiteClient extends EventEmitter {
             method: method,
             json: body,
             qs: qs,
+            useQuerystring: true,
             timeout: timeout,
         };
 

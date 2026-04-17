@@ -760,6 +760,46 @@ class VoyagerStore {
         });
     }
 
+    getAllRooms() {
+        return this.__Nodes.findAll({
+            include: [{
+                model: this.__NodeMeta,
+                as: 'nodeMeta'
+            }],
+            where: {
+                type: 'room',
+                isRedacted: false,
+            },
+            order: [['id', 'DESC']]
+        }).then(results => {
+            var rooms = [];
+            for (var room of results) {
+                var node = new CompleteNode(room);
+                rooms.push(node);
+            }
+
+            var promise = Promise.resolve();
+            var allowedRooms = [];
+            rooms.map(n => promise = promise.then(() => {
+                return this.__Links.findAll({
+                    where: {
+                        [Op.or]: [
+                            {sourceNodeId: n.id},
+                            {targetNodeId: n.id}
+                        ]
+                    }
+                }).then(links => {
+                    for (var link of links)
+                        if (link.type === 'kick' || link.type === 'ban') return;
+
+                    allowedRooms.push(n);
+                });
+            }));
+
+            return promise.then(() => allowedRooms);
+        });
+    }
+
     /**
      * Gets an array of public nodes that have an alias available. Only nodes with meta information or
      * aliases containing the keywords will be returned (either the display name or any other alias). This

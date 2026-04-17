@@ -45,7 +45,7 @@ export default {
     mounted () {
         this.$http.get('/api/v1/stats').then(response => {
             this.stats = response.body;
-            return this.$http.get('/api/v1/nodes/publicRooms');
+            return this.$http.get('/api/v1/nodes/allRooms');
         }).then(response => {
             this.rooms = response.body;
             this.isLoading = false;

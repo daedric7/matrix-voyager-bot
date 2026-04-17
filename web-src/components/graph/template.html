@@ -31,7 +31,8 @@
 
                 <circle v-for="node in graph.nodes"
                         :cx="node.x" :cy="node.y" :opacity="isNodeHovered(node) ? 1 : 0.2"
-                        :r="node.r" :fill="'url(#fillFor'+node.id+')'" stroke='white' stroke-width='2'
+                        :r="node.r" :fill="'url(#fillFor'+node.id+')'"
+                        :stroke="node.isAnonymous ? '#e53935' : 'white'" stroke-width='2'
                         @mouseover="enterItem(node, nodeHover, $event)" @mouseout="exitItem(nodeHover)">
                 </circle>
             </g>

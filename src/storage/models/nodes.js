@@ -37,7 +37,7 @@ module.exports = function (sequelize, DataTypes) {
             field: 'isRedacted'
         },
         firstTimestamp: {
-            type: DataTypes.TIME,
+            type: DataTypes.DATE,
             allowNull: false,
             field: 'firstTimestamp'
         }

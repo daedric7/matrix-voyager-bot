@@ -99,7 +99,9 @@ class VoyagerBot {
             var promise = Promise.resolve();
             _.forEach(matches, match => promise = promise.then(() => this._processMatchedLink(roomId, event, match)));
 
-            promise.then(() => this._client.sendReadReceipt(roomId, event['event_id']));
+            promise.then(() => this._client.sendReadReceipt(roomId, event['event_id'])).catch(err => {
+                log.error("VoyagerBot", "Failed to send read receipt for " + event['event_id'] + ": " + err);
+            });
         });
     }
 
@@ -117,12 +119,33 @@ class VoyagerBot {
         }
     }
 
+    _getViaServersForRoom(roomIdOrAlias, senderUserId) {
+        var servers = new Set();
+
+        // Extract server from room ID (e.g. !opaque:server.org → server.org)
+        // v12 opaque room IDs have no colon-separated server part
+        var roomServerMatch = roomIdOrAlias.match(/^[!#][^:]+:(.+)$/);
+        if (roomServerMatch) servers.add(roomServerMatch[1]);
+
+        // Extract server from sender's user ID (e.g. @user:server.org → server.org)
+        if (senderUserId) {
+            var senderServerMatch = senderUserId.match(/^@[^:]+:(.+)$/);
+            if (senderServerMatch) servers.add(senderServerMatch[1]);
+        }
+
+        // Always include matrix.org as a fallback
+        servers.add('matrix.org');
+
+        return Array.from(servers);
+    }
+
     _processMatchedLink(inRoomId, event, matchedValue, retryCount = 0) {
         var roomId;
         var sourceNode;
         var targetNode;
 
-        return this._client.joinRoom(matchedValue).then(rid => {
+        var viaServers = this._getViaServersForRoom(matchedValue, event['sender']);
+        return this._client.joinRoom(matchedValue, viaServers).then(rid => {
             roomId = rid;
             return this.getNode(roomId, 'room');
         }, err => {
@@ -155,7 +178,8 @@ class VoyagerBot {
             log.info("VoyagerBot", "Attempt #" + event.__voyagerRepeat + " to retry event " + event['event_id']);
         }
 
-        return this._client.joinRoom(roomId)
+        var viaServers = this._getViaServersForRoom(roomId, event['sender']);
+        return this._client.joinRoom(roomId, viaServers)
             .then(() => Promise.all([this.getNode(event['sender'], 'user'), this.getNode(roomId, 'room')]))
             .then(nodes => {
                 sourceNode = nodes[0];

@@ -27,7 +27,7 @@ module.exports = function (sequelize, DataTypes) {
             field: 'matrixEventId'
         },
         timestamp: {
-            type: DataTypes.TIME,
+            type: DataTypes.DATE,
             allowNull: false,
             field: 'timestamp'
         }

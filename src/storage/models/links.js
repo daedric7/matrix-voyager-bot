@@ -31,7 +31,7 @@ module.exports = function (sequelize, DataTypes) {
             }
         },
         timestamp: {
-            type: DataTypes.TIME,
+            type: DataTypes.DATE,
             allowNull: false,
             field: 'timestamp'
         },
