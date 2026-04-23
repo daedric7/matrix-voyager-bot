@@ -93,11 +93,33 @@ class VoyagerBot {
                 return;
             } //else log.silly("VoyagerBot", "User " + event['sender'] + " does not have DNT");
 
-            var matches = body.match(/[#!][a-zA-Z0-9.\-_#=]+:[a-zA-Z0-9.\-_]+[a-zA-Z0-9]/g);
-            if (!matches) return;
+            var links = [];
+            var seenRefs = new Set();
+
+            // Parse matrix.to URLs first to capture room ref + via servers
+            var matrixToRe = /matrix\.to\/#\/((?:[!#][^?#\s]+))(\?[^\s]*)?/g;
+            var urlMatch;
+            while ((urlMatch = matrixToRe.exec(body)) !== null) {
+                var roomRef = urlMatch[1];
+                var viaServers = [];
+                var queryStr = urlMatch[2] || '';
+                var viaRe = /[?&]via=([^&\s]+)/g;
+                var viaMatch;
+                while ((viaMatch = viaRe.exec(queryStr)) !== null) viaServers.push(viaMatch[1]);
+                seenRefs.add(roomRef);
+                links.push({match: roomRef, viaServers});
+            }
+
+            // Also match bare old-style room aliases/IDs not already found via matrix.to URLs
+            var bareMatches = body.match(/[#!][a-zA-Z0-9.\-_#=]+:[a-zA-Z0-9.\-_]+[a-zA-Z0-9]/g) || [];
+            for (var bare of bareMatches) {
+                if (!seenRefs.has(bare)) links.push({match: bare, viaServers: []});
+            }
+
+            if (!links.length) return;
 
             var promise = Promise.resolve();
-            _.forEach(matches, match => promise = promise.then(() => this._processMatchedLink(roomId, event, match)));
+            _.forEach(links, ({match, viaServers}) => promise = promise.then(() => this._processMatchedLink(roomId, event, match, 0, viaServers)));
 
             promise.then(() => this._client.sendReadReceipt(roomId, event['event_id'])).catch(err => {
                 log.error("VoyagerBot", "Failed to send read receipt for " + event['event_id'] + ": " + err);
@@ -119,8 +141,8 @@ class VoyagerBot {
         }
     }
 
-    _getViaServersForRoom(roomIdOrAlias, senderUserId) {
-        var servers = new Set();
+    _getViaServersForRoom(roomIdOrAlias, senderUserId, extraViaServers = []) {
+        var servers = new Set(extraViaServers);
 
         // Extract server from room ID (e.g. !opaque:server.org → server.org)
         // v12 opaque room IDs have no colon-separated server part
@@ -139,18 +161,18 @@ class VoyagerBot {
         return Array.from(servers);
     }
 
-    _processMatchedLink(inRoomId, event, matchedValue, retryCount = 0) {
+    _processMatchedLink(inRoomId, event, matchedValue, retryCount = 0, extraViaServers = []) {
         var roomId;
         var sourceNode;
         var targetNode;
 
-        var viaServers = this._getViaServersForRoom(matchedValue, event['sender']);
+        var viaServers = this._getViaServersForRoom(matchedValue, event['sender'], extraViaServers);
         return this._client.joinRoom(matchedValue, viaServers).then(rid => {
             roomId = rid;
             return this.getNode(roomId, 'room');
         }, err => {
             if (err.httpStatus == 500 && retryCount < 5) {
-                return this._processMatchedLink(event, matchedValue, ++retryCount);
+                return this._processMatchedLink(inRoomId, event, matchedValue, ++retryCount, extraViaServers);
             }
 
             log.error("VoyagerBot", err);
