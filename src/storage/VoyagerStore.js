@@ -771,33 +771,7 @@ class VoyagerStore {
                 isRedacted: false,
             },
             order: [['id', 'DESC']]
-        }).then(results => {
-            var rooms = [];
-            for (var room of results) {
-                var node = new CompleteNode(room);
-                rooms.push(node);
-            }
-
-            var promise = Promise.resolve();
-            var allowedRooms = [];
-            rooms.map(n => promise = promise.then(() => {
-                return this.__Links.findAll({
-                    where: {
-                        [Op.or]: [
-                            {sourceNodeId: n.id},
-                            {targetNodeId: n.id}
-                        ]
-                    }
-                }).then(links => {
-                    for (var link of links)
-                        if (link.type === 'kick' || link.type === 'ban') return;
-
-                    allowedRooms.push(n);
-                });
-            }));
-
-            return promise.then(() => allowedRooms);
-        });
+        }).then(results => results.map(room => new CompleteNode(room)));
     }
 
     /**
